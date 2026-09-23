@@ -10,5 +10,8 @@ Component docs for Omarchy Backgrounds (WinUI 3).
 | Catalog Cache | [catalog-cache.md](catalog-cache.md) | `src/OmarchyBackgrounds.Cache` |
 | Background Store | [background-store.md](background-store.md) | `src/OmarchyBackgrounds.BackgroundStore` |
 | Wallpaper | [wallpaper.md](wallpaper.md) | `src/OmarchyBackgrounds.Wallpaper` |
+| Apply History | [apply-history.md](apply-history.md) | `src/OmarchyBackgrounds.ApplyHistory` |
 
-Product direction: [../ideas/omarchy-backgrounds-windows.md](../ideas/omarchy-backgrounds-windows.md)
+Product ideas:
+- [../ideas/omarchy-backgrounds-windows.md](../ideas/omarchy-backgrounds-windows.md)
+- [../ideas/recent-applied-themes.md](../ideas/recent-applied-themes.md)

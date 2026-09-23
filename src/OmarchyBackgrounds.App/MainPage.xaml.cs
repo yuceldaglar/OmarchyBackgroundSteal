@@ -2,15 +2,18 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using OmarchyBackgrounds.ApplyHistory;
 using OmarchyBackgrounds.Catalog;
 
 namespace OmarchyBackgrounds_App;
 
 public sealed partial class MainPage : Page
 {
+    private Theme? _selectedTheme;
     private BackgroundImage? _selectedBackground;
     private string? _selectedLocalPath;
     private CancellationTokenSource? _thumbnailLoadCts;
+    private bool _suppressRecentSelection;
 
     public MainPage()
     {
@@ -21,6 +24,7 @@ public sealed partial class MainPage : Page
     private async void MainPage_Loaded(object sender, RoutedEventArgs e)
     {
         await RefreshCatalogAsync();
+        await RefreshRecentAsync();
     }
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e)
@@ -69,10 +73,51 @@ public sealed partial class MainPage : Page
         }
     }
 
+    private async Task RefreshRecentAsync()
+    {
+        try
+        {
+            var items = await AppServices.ApplyHistory.ListAsync();
+            _suppressRecentSelection = true;
+            RecentList.ItemsSource = items.ToList();
+            RecentList.SelectedItem = null;
+        }
+        finally
+        {
+            _suppressRecentSelection = false;
+        }
+    }
+
+    private void RecentList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressRecentSelection || RecentList.SelectedItem is not AppliedThemeEntry entry)
+        {
+            return;
+        }
+
+        if (ThemeList.ItemsSource is not IEnumerable<Theme> themes)
+        {
+            StatusText.Text = $"Theme not in catalog: {entry.Name}";
+            return;
+        }
+
+        var match = themes.FirstOrDefault(t =>
+            string.Equals(t.Id, entry.ThemeId, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+        {
+            StatusText.Text = $"Theme not in catalog: {entry.Name}. Try Refresh catalog.";
+            return;
+        }
+
+        ThemeList.SelectedItem = match;
+        ThemeList.ScrollIntoView(match);
+    }
+
     private async void ThemeList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedBackground = null;
         _selectedLocalPath = null;
+        _selectedTheme = null;
         SetApplyButtonsEnabled(false);
         PreviewImage.Source = null;
         _thumbnailLoadCts?.Cancel();
@@ -86,6 +131,7 @@ public sealed partial class MainPage : Page
             return;
         }
 
+        _selectedTheme = theme;
         AttributionText.Text = theme.RepoUrl;
         if (Uri.TryCreate(theme.RepoUrl, UriKind.Absolute, out var repoUri))
         {
@@ -217,6 +263,18 @@ public sealed partial class MainPage : Page
             if (lockScreen)
             {
                 await AppServices.WallpaperApplier.SetLockScreenAsync(_selectedLocalPath);
+            }
+
+            if (_selectedTheme is not null)
+            {
+                await AppServices.ApplyHistory.RecordAsync(new AppliedThemeEntry
+                {
+                    ThemeId = _selectedTheme.Id,
+                    Name = _selectedTheme.Name,
+                    RepoUrl = _selectedTheme.RepoUrl,
+                    AppliedAt = DateTimeOffset.UtcNow,
+                });
+                await RefreshRecentAsync();
             }
 
             StatusText.Text = $"Applied {string.Join(" + ", targets)}: {_selectedBackground.FileName}";

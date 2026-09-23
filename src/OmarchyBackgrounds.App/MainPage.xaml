@@ -7,6 +7,7 @@
     xmlns:local="using:OmarchyBackgrounds_App"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:catalog="using:OmarchyBackgrounds.Catalog"
+    xmlns:history="using:OmarchyBackgrounds.ApplyHistory"
     mc:Ignorable="d">
 
     <Grid Padding="16" RowSpacing="12" ColumnSpacing="16">
@@ -39,7 +40,9 @@
         <Grid Grid.Row="2" Grid.Column="0" RowSpacing="8">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="*" MinHeight="120" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="140" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock FontWeight="SemiBold" Text="Themes" />
@@ -53,9 +56,23 @@
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+            <TextBlock
+                Grid.Row="2"
+                FontWeight="SemiBold"
+                Text="Recent" />
+            <ListView
+                x:Name="RecentList"
+                Grid.Row="3"
+                SelectionChanged="RecentList_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="history:AppliedThemeEntry">
+                        <TextBlock Text="{x:Bind Name}" TextWrapping="NoWrap" />
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
             <Button
                 x:Name="RefreshButton"
-                Grid.Row="2"
+                Grid.Row="4"
                 HorizontalAlignment="Stretch"
                 Click="RefreshButton_Click"
                 Content="Refresh catalog" />
