@@ -13,6 +13,7 @@ public sealed class CatalogService
 {
     private readonly IThemeScraper _scraper;
     private readonly ICatalogCache _cache;
+    private ThemeCatalog? _current;
 
     public CatalogService(IThemeScraper scraper, ICatalogCache cache)
     {
@@ -25,7 +26,11 @@ public sealed class CatalogService
         try
         {
             var catalog = await _scraper.ScrapeAsync(cancellationToken).ConfigureAwait(false);
+            var previous = await _cache.LoadAsync(cancellationToken).ConfigureAwait(false)
+                ?? _current;
+            MergeCachedBackgrounds(catalog, previous);
             await _cache.SaveAsync(catalog, cancellationToken).ConfigureAwait(false);
+            _current = catalog;
             return new CatalogRefreshResult
             {
                 Catalog = catalog,
@@ -37,6 +42,7 @@ public sealed class CatalogService
             var cached = await _cache.LoadAsync(cancellationToken).ConfigureAwait(false);
             if (cached is not null)
             {
+                _current = cached;
                 return new CatalogRefreshResult
                 {
                     Catalog = cached,
@@ -51,6 +57,45 @@ public sealed class CatalogService
                 UsedCacheFallback = true,
                 ErrorMessage = ex.Message,
             };
+        }
+    }
+
+    public async Task EnsureBackgroundsAsync(Theme theme, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(theme);
+        if (theme.Backgrounds.Count > 0)
+        {
+            return;
+        }
+
+        await _scraper.LoadBackgroundsAsync(theme, cancellationToken).ConfigureAwait(false);
+
+        if (_current is not null)
+        {
+            await _cache.SaveAsync(_current, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static void MergeCachedBackgrounds(ThemeCatalog fresh, ThemeCatalog? previous)
+    {
+        if (previous is null || previous.Themes.Count == 0)
+        {
+            return;
+        }
+
+        var byId = previous.Themes
+            .Where(t => t.Backgrounds.Count > 0)
+            .ToDictionary(t => t.Id, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var theme in fresh.Themes)
+        {
+            if (theme.Backgrounds.Count == 0 && byId.TryGetValue(theme.Id, out var cached))
+            {
+                foreach (var background in cached.Backgrounds)
+                {
+                    theme.Backgrounds.Add(background);
+                }
+            }
         }
     }
 }

@@ -27,36 +27,26 @@ public class ThemeScraperTests
     }
 
     [Fact]
-    public async Task ScrapeAsync_builds_catalog_from_html_and_github_contents()
+    public async Task ScrapeAsync_lists_all_themes_without_github_contents_calls()
     {
-        var handler = new StubHandler(async (request, ct) =>
+        var githubCalls = 0;
+        var handler = new StubHandler((request, _) =>
         {
             var url = request.RequestUri!.ToString();
             if (url.Contains("omarchy.org/themes", StringComparison.OrdinalIgnoreCase))
             {
-                return Html("""
+                return Task.FromResult(Html("""
                     <a href="https://github.com/bjarneo/omarchy-aura-theme">Aura</a>
                     <a href="https://github.com/someone/empty-theme">Empty</a>
-                    """);
+                    """));
             }
 
-            if (url.Contains("repos/bjarneo/omarchy-aura-theme/contents/backgrounds", StringComparison.Ordinal))
+            if (url.Contains("api.github.com", StringComparison.OrdinalIgnoreCase))
             {
-                return Json("""
-                    [
-                      {"name":"1.png","type":"file","download_url":"https://raw.githubusercontent.com/bjarneo/omarchy-aura-theme/main/backgrounds/1.png"},
-                      {"name":"readme.txt","type":"file","download_url":"https://example.com/readme.txt"},
-                      {"name":"nested","type":"dir","download_url":null}
-                    ]
-                    """);
+                Interlocked.Increment(ref githubCalls);
             }
 
-            if (url.Contains("repos/someone/empty-theme/contents/backgrounds", StringComparison.Ordinal))
-            {
-                return new HttpResponseMessage(HttpStatusCode.NotFound);
-            }
-
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         });
 
         using var client = new HttpClient(handler);
@@ -64,10 +54,42 @@ public class ThemeScraperTests
 
         var catalog = await scraper.ScrapeAsync();
 
-        Assert.Single(catalog.Themes);
-        var theme = catalog.Themes[0];
-        Assert.Equal("Aura", theme.Name);
-        Assert.Equal("https://github.com/bjarneo/omarchy-aura-theme", theme.RepoUrl);
+        Assert.Equal(2, catalog.Themes.Count);
+        Assert.All(catalog.Themes, t => Assert.Empty(t.Backgrounds));
+        Assert.Equal(0, githubCalls);
+    }
+
+    [Fact]
+    public async Task LoadBackgroundsAsync_fills_theme_from_github_contents()
+    {
+        var handler = new StubHandler((request, _) =>
+        {
+            var url = request.RequestUri!.ToString();
+            if (url.Contains("repos/bjarneo/omarchy-aura-theme/contents/backgrounds", StringComparison.Ordinal))
+            {
+                return Task.FromResult(Json("""
+                    [
+                      {"name":"1.png","type":"file","download_url":"https://raw.githubusercontent.com/bjarneo/omarchy-aura-theme/main/backgrounds/1.png"},
+                      {"name":"readme.txt","type":"file","download_url":"https://example.com/readme.txt"},
+                      {"name":"nested","type":"dir","download_url":null}
+                    ]
+                    """));
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+
+        using var client = new HttpClient(handler);
+        var scraper = new ThemeScraper(client);
+        var theme = new Theme
+        {
+            Id = "bjarneo/omarchy-aura-theme",
+            Name = "Aura",
+            RepoUrl = "https://github.com/bjarneo/omarchy-aura-theme",
+        };
+
+        await scraper.LoadBackgroundsAsync(theme);
+
         Assert.Single(theme.Backgrounds);
         Assert.Equal("1.png", theme.Backgrounds[0].FileName);
         Assert.Contains("raw.githubusercontent.com", theme.Backgrounds[0].ImageUrl);
@@ -113,6 +135,9 @@ public class ThemeScraperTests
     {
         public Task<ThemeCatalog> ScrapeAsync(CancellationToken cancellationToken = default) =>
             throw new HttpRequestException("network down");
+
+        public Task LoadBackgroundsAsync(Theme theme, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class StubHandler : HttpMessageHandler

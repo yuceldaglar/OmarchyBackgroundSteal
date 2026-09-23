@@ -27,13 +27,11 @@ public sealed class ThemeScraper : IThemeScraper
 
     private readonly HttpClient _httpClient;
     private readonly string _themesUrl;
-    private readonly int? _maxThemes;
 
-    public ThemeScraper(HttpClient httpClient, string? themesUrl = null, int? maxThemes = null)
+    public ThemeScraper(HttpClient httpClient, string? themesUrl = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _themesUrl = string.IsNullOrWhiteSpace(themesUrl) ? DefaultThemesUrl : themesUrl;
-        _maxThemes = maxThemes;
 
         if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
         {
@@ -46,10 +44,6 @@ public sealed class ThemeScraper : IThemeScraper
     {
         var html = await _httpClient.GetStringAsync(_themesUrl, cancellationToken).ConfigureAwait(false);
         var repos = ExtractRepos(html);
-        if (_maxThemes is int limit)
-        {
-            repos = repos.Take(limit).ToList();
-        }
 
         var catalog = new ThemeCatalog
         {
@@ -59,15 +53,72 @@ public sealed class ThemeScraper : IThemeScraper
 
         foreach (var repo in repos)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var theme = await TryBuildThemeAsync(repo, cancellationToken).ConfigureAwait(false);
-            if (theme is not null && theme.Backgrounds.Count > 0)
+            var themeName = HumanizeThemeName(repo.Name);
+            catalog.Themes.Add(new Theme
             {
-                catalog.Themes.Add(theme);
-            }
+                Id = $"{repo.Owner}/{repo.Name}".ToLowerInvariant(),
+                Name = themeName,
+                RepoUrl = repo.HtmlUrl,
+            });
         }
 
         return catalog;
+    }
+
+    public async Task LoadBackgroundsAsync(Theme theme, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(theme);
+        if (theme.Backgrounds.Count > 0)
+        {
+            return;
+        }
+
+        if (!TryParseRepo(theme.RepoUrl, out var owner, out var name))
+        {
+            return;
+        }
+
+        var apiUrl = $"https://api.github.com/repos/{owner}/{name}/contents/backgrounds";
+        using var response = await _httpClient.GetAsync(apiUrl, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return;
+        }
+
+        response.EnsureSuccessStatusCode();
+        var entries = await response.Content
+            .ReadFromJsonAsync<List<GitHubContentItem>>(cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (entries is null || entries.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            if (!string.Equals(entry.Type, "file", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var extension = Path.GetExtension(entry.Name);
+            if (!ImageExtensions.Contains(extension))
+            {
+                continue;
+            }
+
+            var imageUrl = entry.DownloadUrl
+                ?? $"https://raw.githubusercontent.com/{owner}/{name}/HEAD/backgrounds/{entry.Name}";
+
+            theme.Backgrounds.Add(new BackgroundImage
+            {
+                Id = $"{theme.Id}:{entry.Name}",
+                FileName = entry.Name,
+                ImageUrl = imageUrl,
+                Attribution = $"{theme.Name} — {theme.RepoUrl}",
+            });
+        }
     }
 
     internal static IReadOnlyList<GitHubRepo> ExtractRepos(string html)
@@ -84,20 +135,12 @@ public sealed class ThemeScraper : IThemeScraper
                 repo = repo[..^4];
             }
 
-            // Skip compare/blob/tree path tails accidentally captured as repo names.
-            if (repo.Contains('.', StringComparison.Ordinal) && !repo.Contains('-', StringComparison.Ordinal)
-                && repo is not ("omarchy" or "omarchy-site"))
-            {
-                // still allow normal repo names with dots
-            }
-
             var key = $"{owner}/{repo}";
             if (IgnoredRepos.Contains(key) || key.Contains("/compare", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            // Drop path segments that aren't repos (e.g. omarchy-site/compare).
             if (repo.Equals("compare", StringComparison.OrdinalIgnoreCase)
                 || repo.Equals("blob", StringComparison.OrdinalIgnoreCase)
                 || repo.Equals("tree", StringComparison.OrdinalIgnoreCase)
@@ -117,59 +160,24 @@ public sealed class ThemeScraper : IThemeScraper
         return repos;
     }
 
-    private async Task<Theme?> TryBuildThemeAsync(GitHubRepo repo, CancellationToken cancellationToken)
+    private static bool TryParseRepo(string repoUrl, out string owner, out string name)
     {
-        var apiUrl = $"https://api.github.com/repos/{repo.Owner}/{repo.Name}/contents/backgrounds";
-        using var response = await _httpClient.GetAsync(apiUrl, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        owner = string.Empty;
+        name = string.Empty;
+        var match = GitHubRepoRegex.Match(repoUrl);
+        if (!match.Success)
         {
-            return null;
+            return false;
         }
 
-        response.EnsureSuccessStatusCode();
-        var entries = await response.Content
-            .ReadFromJsonAsync<List<GitHubContentItem>>(cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-        if (entries is null || entries.Count == 0)
+        owner = match.Groups["owner"].Value;
+        name = match.Groups["repo"].Value.TrimEnd('/');
+        if (name.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
         {
-            return null;
+            name = name[..^4];
         }
 
-        var themeName = HumanizeThemeName(repo.Name);
-        var theme = new Theme
-        {
-            Id = $"{repo.Owner}/{repo.Name}".ToLowerInvariant(),
-            Name = themeName,
-            RepoUrl = repo.HtmlUrl,
-        };
-
-        foreach (var entry in entries)
-        {
-            if (!string.Equals(entry.Type, "file", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var extension = Path.GetExtension(entry.Name);
-            if (!ImageExtensions.Contains(extension))
-            {
-                continue;
-            }
-
-            var imageUrl = entry.DownloadUrl
-                ?? $"https://raw.githubusercontent.com/{repo.Owner}/{repo.Name}/HEAD/backgrounds/{entry.Name}";
-
-            theme.Backgrounds.Add(new BackgroundImage
-            {
-                Id = $"{theme.Id}:{entry.Name}",
-                FileName = entry.Name,
-                ImageUrl = imageUrl,
-                Attribution = $"{themeName} — {repo.HtmlUrl}",
-            });
-        }
-
-        return theme.Backgrounds.Count == 0 ? null : theme;
+        return owner.Length > 0 && name.Length > 0;
     }
 
     private static string HumanizeThemeName(string repoName)

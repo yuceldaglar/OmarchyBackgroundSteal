@@ -86,21 +86,48 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        var items = theme.Backgrounds.Select(b => new BackgroundItemVm(b)).ToList();
-        BackgroundGrid.ItemsSource = items;
         AttributionText.Text = theme.RepoUrl;
         if (Uri.TryCreate(theme.RepoUrl, UriKind.Absolute, out var repoUri))
         {
             SourceLink.NavigateUri = repoUri;
         }
 
+        BackgroundGrid.ItemsSource = null;
+        StatusText.Text = $"Loading backgrounds for {theme.Name}…";
+        try
+        {
+            await AppServices.CatalogService.EnsureBackgroundsAsync(theme);
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Failed to load backgrounds: {ex.Message}";
+            return;
+        }
+
+        if (theme.Backgrounds.Count == 0)
+        {
+            StatusText.Text = $"{theme.Name} has no backgrounds folder (or GitHub returned none).";
+            return;
+        }
+
+        var items = theme.Backgrounds.Select(b => new BackgroundItemVm(b)).ToList();
+        BackgroundGrid.ItemsSource = items;
+
         if (items.Count > 0)
         {
             BackgroundGrid.SelectedIndex = 0;
         }
 
+        StatusText.Text = $"{theme.Name}: {items.Count} background(s)";
         _thumbnailLoadCts = new CancellationTokenSource();
-        await LoadThumbnailsAsync(items, _thumbnailLoadCts.Token);
+        try
+        {
+            await LoadThumbnailsAsync(items, _thumbnailLoadCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Theme changed before thumbnails finished.
+        }
     }
 
     private async Task LoadThumbnailsAsync(IReadOnlyList<BackgroundItemVm> items, CancellationToken cancellationToken)
