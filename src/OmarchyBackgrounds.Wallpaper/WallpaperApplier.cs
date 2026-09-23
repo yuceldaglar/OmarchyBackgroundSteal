@@ -58,7 +58,16 @@ public sealed class WallpaperApplier : IWallpaperApplier
     public async Task ApplyAsync(string imagePath, CancellationToken cancellationToken = default)
     {
         await SetDesktopAsync(imagePath, cancellationToken).ConfigureAwait(false);
-        await SetLockScreenAsync(imagePath, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await SetLockScreenAsync(imagePath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException(
+                $"Desktop wallpaper was applied, but lock screen failed: {ex.Message}", ex);
+        }
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Omarchy Backgrounds",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/src/OmarchyBackgrounds.App/OmarchyBackgrounds.App.csproj"
+    }
+  ]
+}

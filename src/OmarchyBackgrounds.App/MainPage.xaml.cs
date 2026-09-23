@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -109,7 +110,7 @@ public sealed partial class MainPage : Page
         try
         {
             _selectedLocalPath = await AppServices.BackgroundStore.GetLocalPathAsync(background);
-            PreviewImage.Source = new BitmapImage(new Uri(_selectedLocalPath));
+            await SetPreviewFromPathAsync(_selectedLocalPath);
             ApplyButton.IsEnabled = true;
             StatusText.Text = $"Ready: {background.FileName}";
         }
@@ -143,5 +144,15 @@ public sealed partial class MainPage : Page
         {
             ApplyButton.IsEnabled = _selectedLocalPath is not null;
         }
+    }
+
+    private async Task SetPreviewFromPathAsync(string localPath)
+    {
+        // Avoid file:// URI issues with special characters (e.g. "@" in theme filenames).
+        await using var stream = File.OpenRead(localPath);
+        var ras = stream.AsRandomAccessStream();
+        var bitmap = new BitmapImage();
+        await bitmap.SetSourceAsync(ras);
+        PreviewImage.Source = bitmap;
     }
 }

@@ -62,6 +62,7 @@ public sealed class FileBackgroundStore : IBackgroundStore
         var shortHash = hash[..16];
         var baseName = Path.GetFileNameWithoutExtension(background.FileName);
         baseName = string.Join("_", baseName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+        baseName = baseName.Replace('@', '_').Replace('#', '_');
         if (string.IsNullOrWhiteSpace(baseName))
         {
             baseName = "background";
