@@ -12,12 +12,16 @@ Apply a local image file as the Windows **desktop wallpaper** and **lock screen*
 
 ## Implementation notes
 - Desktop: Win32 `SystemParametersInfoW` with `SPI_SETDESKWALLPAPER` and `SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE`.
-- Lock screen: WinRT `UserProfilePersonalizationSettings.TrySetLockScreenImageAsync` (requires package identity / supported SKU).
-- Missing files and unsupported lock-screen personalization throw; callers surface errors to the UI.
+- Lock screen (tried in order):
+  1. Copy to `%LocalAppData%\OmarchyBackgrounds\applied\lockscreen_*` (unique name)
+  2. WinRT `UserProfilePersonalizationSettings.TrySetLockScreenImageAsync` / `LockScreen.SetImageFileAsync` (best with package identity)
+  3. `PersonalizationCSP` registry (`LockScreenImagePath` / `Url` / `Status`) under HKCU, then HKLM if writable
+- Unpackaged debug builds often fail WinRT lock-screen APIs; the registry fallback covers many Home/Pro setups without admin.
 
 ## Dependencies
 - Windows desktop (user32)
 - Windows Runtime user profile APIs
+- Microsoft.Win32 registry
 - No dependency on Catalog, Scraper, or BackgroundStore
 
 ## Project
