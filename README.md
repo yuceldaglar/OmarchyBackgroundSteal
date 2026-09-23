@@ -35,3 +35,7 @@ dotnet test .\OmarchyBackgroundSteal.sln -c Debug
 
 - Product idea: [docs/ideas/omarchy-backgrounds-windows.md](docs/ideas/omarchy-backgrounds-windows.md)
 - Components: [docs/components/README.md](docs/components/README.md)
+
+## License
+
+[MIT](LICENSE)
