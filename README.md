@@ -4,13 +4,13 @@ WinUI 3 app to browse Omarchy theme backgrounds and apply them to desktop + lock
 
 ## Run
 
-Open **`OmarchyBackgroundSteal.slnx`** or **`OmarchyBackgroundSteal.sln`** in Visual Studio.
+Open **`OmarchyBackgroundSteal.sln`** in Visual Studio (**not** `.slnx` — that file was removed because VS kept selecting Any CPU, which WinUI does not support).
 
-1. Toolbar: **Debug** + **x64** (do not use Any CPU — this WinUI app does not support it)
+1. Toolbar: **Debug** + **x64**
 2. Right-click **OmarchyBackgrounds.App** → **Set as Startup Project**
 3. Press **F5**
 
-If Visual Studio still shows the old configuration error: close the solution, delete the hidden `.vs` folder in the repo root, then reopen.
+If an old error dialog still appears: close Visual Studio completely, confirm the repo has no `.vs` folder, then open `OmarchyBackgroundSteal.sln` again.
 
 Or from the repo root:
 
