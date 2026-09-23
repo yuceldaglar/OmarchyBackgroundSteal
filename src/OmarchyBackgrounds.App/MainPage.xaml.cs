@@ -10,6 +10,7 @@ public sealed partial class MainPage : Page
 {
     private BackgroundImage? _selectedBackground;
     private string? _selectedLocalPath;
+    private CancellationTokenSource? _thumbnailLoadCts;
 
     public MainPage()
     {
@@ -68,12 +69,15 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private void ThemeList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ThemeList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _selectedBackground = null;
         _selectedLocalPath = null;
         ApplyButton.IsEnabled = false;
         PreviewImage.Source = null;
+        _thumbnailLoadCts?.Cancel();
+        _thumbnailLoadCts?.Dispose();
+        _thumbnailLoadCts = null;
 
         if (ThemeList.SelectedItem is not Theme theme)
         {
@@ -82,26 +86,51 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        BackgroundGrid.ItemsSource = theme.Backgrounds.ToList();
+        var items = theme.Backgrounds.Select(b => new BackgroundItemVm(b)).ToList();
+        BackgroundGrid.ItemsSource = items;
         AttributionText.Text = theme.RepoUrl;
         if (Uri.TryCreate(theme.RepoUrl, UriKind.Absolute, out var repoUri))
         {
             SourceLink.NavigateUri = repoUri;
         }
 
-        if (theme.Backgrounds.Count > 0)
+        if (items.Count > 0)
         {
             BackgroundGrid.SelectedIndex = 0;
+        }
+
+        _thumbnailLoadCts = new CancellationTokenSource();
+        await LoadThumbnailsAsync(items, _thumbnailLoadCts.Token);
+    }
+
+    private async Task LoadThumbnailsAsync(IReadOnlyList<BackgroundItemVm> items, CancellationToken cancellationToken)
+    {
+        foreach (var item in items)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await item.LoadThumbnailAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // Keep the tile visible with filename even if one thumbnail fails.
+            }
         }
     }
 
     private async void BackgroundGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (BackgroundGrid.SelectedItem is not BackgroundImage background)
+        if (BackgroundGrid.SelectedItem is not BackgroundItemVm item)
         {
             return;
         }
 
+        var background = item.Background;
         _selectedBackground = background;
         AttributionText.Text = background.Attribution;
         ApplyButton.IsEnabled = false;
