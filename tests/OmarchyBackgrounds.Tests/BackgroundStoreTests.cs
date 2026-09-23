@@ -26,7 +26,7 @@ public class BackgroundStoreTests
             });
 
             using var client = new HttpClient(handler);
-            var store = new BackgroundStore(client, dir);
+            var store = new FileBackgroundStore(client, dir);
             var background = new BackgroundImage
             {
                 Id = "aura:1.png",

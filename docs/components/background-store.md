@@ -5,7 +5,7 @@ Download theme wallpaper images on demand and keep a durable local cache for pre
 
 ## API boundary
 - `IBackgroundStore.GetLocalPathAsync(BackgroundImage)` → absolute local file path
-- Implementation: `BackgroundStore`
+- Implementation: `FileBackgroundStore`
   - Root: `%LocalAppData%\OmarchyBackgrounds\images\` (overridable)
   - Safe file names derived from original name + short hash of background id
   - Existing non-empty files are reused (no re-download)

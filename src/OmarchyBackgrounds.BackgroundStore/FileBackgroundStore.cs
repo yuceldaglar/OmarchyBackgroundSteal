@@ -4,12 +4,12 @@ using OmarchyBackgrounds.Catalog;
 
 namespace OmarchyBackgrounds.BackgroundStore;
 
-public sealed class BackgroundStore : IBackgroundStore
+public sealed class FileBackgroundStore : IBackgroundStore
 {
     private readonly HttpClient _httpClient;
     private readonly string _imagesDirectory;
 
-    public BackgroundStore(HttpClient httpClient, string? rootDirectory = null)
+    public FileBackgroundStore(HttpClient httpClient, string? rootDirectory = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         var root = rootDirectory
