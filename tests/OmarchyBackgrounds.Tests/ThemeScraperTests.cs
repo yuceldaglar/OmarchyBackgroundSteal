@@ -60,20 +60,33 @@ public class ThemeScraperTests
     }
 
     [Fact]
-    public async Task LoadBackgroundsAsync_fills_theme_from_github_contents()
+    public async Task LoadBackgroundsAsync_prefers_jsdelivr_and_skips_github_api()
     {
+        var githubApiCalls = 0;
         var handler = new StubHandler((request, _) =>
         {
             var url = request.RequestUri!.ToString();
-            if (url.Contains("repos/bjarneo/omarchy-aura-theme/contents/backgrounds", StringComparison.Ordinal))
+            if (url.Contains("data.jsdelivr.com/v1/packages/gh/bjarneo/omarchy-aura-theme@main", StringComparison.Ordinal))
             {
                 return Task.FromResult(Json("""
-                    [
-                      {"name":"1.png","type":"file","download_url":"https://raw.githubusercontent.com/bjarneo/omarchy-aura-theme/main/backgrounds/1.png"},
-                      {"name":"readme.txt","type":"file","download_url":"https://example.com/readme.txt"},
-                      {"name":"nested","type":"dir","download_url":null}
-                    ]
+                    {
+                      "files": [
+                        {
+                          "type": "directory",
+                          "name": "backgrounds",
+                          "files": [
+                            { "type": "file", "name": "1.png", "size": 10 },
+                            { "type": "file", "name": "readme.txt", "size": 1 }
+                          ]
+                        }
+                      ]
+                    }
                     """));
+            }
+
+            if (url.Contains("api.github.com", StringComparison.OrdinalIgnoreCase))
+            {
+                Interlocked.Increment(ref githubApiCalls);
             }
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
@@ -92,7 +105,8 @@ public class ThemeScraperTests
 
         Assert.Single(theme.Backgrounds);
         Assert.Equal("1.png", theme.Backgrounds[0].FileName);
-        Assert.Contains("raw.githubusercontent.com", theme.Backgrounds[0].ImageUrl);
+        Assert.Contains("cdn.jsdelivr.net", theme.Backgrounds[0].ImageUrl);
+        Assert.Equal(0, githubApiCalls);
     }
 
     [Fact]

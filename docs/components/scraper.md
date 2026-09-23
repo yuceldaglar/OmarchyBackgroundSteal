@@ -1,17 +1,16 @@
 # Theme Scraper
 
 ## Purpose
-Discover Omarchy community themes and their wallpaper files by scraping [omarchy.org/themes](https://omarchy.org/themes/) and resolving each theme’s GitHub `backgrounds/` folder **on demand**.
+Discover Omarchy community themes and their wallpaper files by scraping [omarchy.org/themes](https://omarchy.org/themes/) and resolving each theme’s `backgrounds/` folder **on demand** without burning GitHub API quota.
 
 ## API boundary
 - `IThemeScraper.ScrapeAsync()` → `ThemeCatalog`
   - Parses unique `github.com/{owner}/{repo}` links from the themes HTML
-  - Skips site repos (`omacom/omarchy`, compare links, etc.)
-  - Returns **all** themes with empty `Backgrounds` (no GitHub API calls)
-- `IThemeScraper.LoadBackgroundsAsync(Theme)`
-  - Calls GitHub Contents API: `/repos/{owner}/{repo}/contents/backgrounds`
-  - Keeps image files only (`.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp`, `.gif`)
-  - Uses `download_url` from GitHub when present
+  - Returns **all** themes with empty `Backgrounds`
+- `IThemeScraper.LoadBackgroundsAsync(Theme)` tries, in order:
+  1. **jsDelivr** `data.jsdelivr.com` package listing + `cdn.jsdelivr.net` image URLs (default; no GitHub REST quota)
+  2. GitHub HTML `/tree/{branch}/backgrounds` scrape
+  3. GitHub Contents API (last resort). Optional token via `OMARCHY_GITHUB_TOKEN` or `GITHUB_TOKEN` raises the limit (~5000/hr authenticated)
 
 ## CatalogService
 - `RefreshAsync()` — scrape full theme list, merge any previously cached backgrounds, save cache
@@ -20,7 +19,7 @@ Discover Omarchy community themes and their wallpaper files by scraping [omarchy
 
 ## Dependencies
 - `OmarchyBackgrounds.Catalog` models + `IThemeScraper`
-- `HttpClient` (caller supplies; must send a User-Agent for GitHub)
+- `HttpClient` (caller supplies; must send a User-Agent)
 
 ## Project
 `src/OmarchyBackgrounds.Scraper` (+ `CatalogService` in `src/OmarchyBackgrounds.Catalog`)

@@ -1,5 +1,7 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using OmarchyBackgrounds.Catalog;
@@ -14,6 +16,10 @@ public sealed class ThemeScraper : IThemeScraper
         @"https?://github\.com/(?<owner>[A-Za-z0-9_.-]+)/(?<repo>[A-Za-z0-9_.-]+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex GitHubBlobPathRegex = new(
+        @"/blob/(?<branch>[^/]+)/backgrounds/(?<file>[^""?\s]+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif",
@@ -25,13 +31,20 @@ public sealed class ThemeScraper : IThemeScraper
         "omacom/omarchy-site",
     };
 
+    private static readonly string[] PreferredRefs = ["main", "master"];
+
     private readonly HttpClient _httpClient;
     private readonly string _themesUrl;
+    private readonly string? _githubToken;
 
-    public ThemeScraper(HttpClient httpClient, string? themesUrl = null)
+    public ThemeScraper(HttpClient httpClient, string? themesUrl = null, string? githubToken = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _themesUrl = string.IsNullOrWhiteSpace(themesUrl) ? DefaultThemesUrl : themesUrl;
+        _githubToken = string.IsNullOrWhiteSpace(githubToken)
+            ? Environment.GetEnvironmentVariable("OMARCHY_GITHUB_TOKEN")
+              ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN")
+            : githubToken;
 
         if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
         {
@@ -78,11 +91,206 @@ public sealed class ThemeScraper : IThemeScraper
             return;
         }
 
-        var apiUrl = $"https://api.github.com/repos/{owner}/{name}/contents/backgrounds";
-        using var response = await _httpClient.GetAsync(apiUrl, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        // Prefer jsDelivr — does not consume GitHub REST API quota.
+        if (await TryLoadFromJsDelivrAsync(theme, owner, name, cancellationToken).ConfigureAwait(false))
         {
             return;
+        }
+
+        // Fallback: scrape GitHub HTML directory pages.
+        if (await TryLoadFromGitHubHtmlAsync(theme, owner, name, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        // Last resort: GitHub Contents API (optional token raises limit from ~60/hr to 5000/hr).
+        await TryLoadFromGitHubApiAsync(theme, owner, name, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> TryLoadFromJsDelivrAsync(
+        Theme theme,
+        string owner,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        foreach (var gitRef in PreferredRefs)
+        {
+            var url = $"https://data.jsdelivr.com/v1/packages/gh/{owner}/{name}@{gitRef}";
+            using var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                continue;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
+                .ConfigureAwait(false);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            var files = new List<(string FileName, string ImageUrl)>();
+            CollectBackgroundFilesFromJsDelivr(
+                document.RootElement,
+                owner,
+                name,
+                gitRef,
+                currentDir: null,
+                files);
+
+            if (files.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var file in files.DistinctBy(f => f.FileName, StringComparer.OrdinalIgnoreCase))
+            {
+                theme.Backgrounds.Add(new BackgroundImage
+                {
+                    Id = $"{theme.Id}:{file.FileName}",
+                    FileName = file.FileName,
+                    ImageUrl = file.ImageUrl,
+                    Attribution = $"{theme.Name} — {theme.RepoUrl}",
+                });
+            }
+
+            return theme.Backgrounds.Count > 0;
+        }
+
+        return false;
+    }
+
+    private static void CollectBackgroundFilesFromJsDelivr(
+        JsonElement node,
+        string owner,
+        string name,
+        string gitRef,
+        string? currentDir,
+        List<(string FileName, string ImageUrl)> files)
+    {
+        if (node.ValueKind == JsonValueKind.Object)
+        {
+            var type = node.TryGetProperty("type", out var typeProp) ? typeProp.GetString() : null;
+            var entryName = node.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
+
+            if (string.Equals(type, "file", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(entryName)
+                && string.Equals(currentDir, "backgrounds", StringComparison.OrdinalIgnoreCase))
+            {
+                var extension = Path.GetExtension(entryName);
+                if (ImageExtensions.Contains(extension))
+                {
+                    var imageUrl =
+                        $"https://cdn.jsdelivr.net/gh/{owner}/{name}@{gitRef}/backgrounds/{entryName}";
+                    files.Add((entryName, imageUrl));
+                }
+            }
+
+            if (node.TryGetProperty("files", out var children)
+                && children.ValueKind == JsonValueKind.Array)
+            {
+                var nextDir = currentDir;
+                if (string.Equals(type, "directory", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(entryName))
+                {
+                    nextDir = currentDir is null ? entryName : $"{currentDir}/{entryName}";
+                }
+
+                foreach (var child in children.EnumerateArray())
+                {
+                    CollectBackgroundFilesFromJsDelivr(child, owner, name, gitRef, nextDir, files);
+                }
+            }
+
+            return;
+        }
+
+        if (node.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in node.EnumerateArray())
+            {
+                CollectBackgroundFilesFromJsDelivr(child, owner, name, gitRef, currentDir, files);
+            }
+        }
+    }
+
+    private async Task<bool> TryLoadFromGitHubHtmlAsync(
+        Theme theme,
+        string owner,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        foreach (var branch in PreferredRefs)
+        {
+            var url = $"https://github.com/{owner}/{name}/tree/{branch}/backgrounds";
+            using var response = await _httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            var html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Match match in GitHubBlobPathRegex.Matches(html))
+            {
+                var fileName = Uri.UnescapeDataString(match.Groups["file"].Value);
+                if (fileName.Contains('/', StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var extension = Path.GetExtension(fileName);
+                if (!ImageExtensions.Contains(extension) || !seen.Add(fileName))
+                {
+                    continue;
+                }
+
+                var matchedBranch = match.Groups["branch"].Value;
+                theme.Backgrounds.Add(new BackgroundImage
+                {
+                    Id = $"{theme.Id}:{fileName}",
+                    FileName = fileName,
+                    ImageUrl = $"https://raw.githubusercontent.com/{owner}/{name}/{matchedBranch}/backgrounds/{fileName}",
+                    Attribution = $"{theme.Name} — {theme.RepoUrl}",
+                });
+            }
+
+            if (theme.Backgrounds.Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task TryLoadFromGitHubApiAsync(
+        Theme theme,
+        string owner,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var apiUrl = $"https://api.github.com/repos/{owner}/{name}/contents/backgrounds";
+        using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+        if (!string.IsNullOrWhiteSpace(_githubToken))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _githubToken);
+        }
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return;
+        }
+
+        if ((int)response.StatusCode == 403 || (int)response.StatusCode == 429)
+        {
+            throw new InvalidOperationException(
+                "GitHub API rate limit exceeded. Background listing now prefers jsDelivr; " +
+                "if this persists, set OMARCHY_GITHUB_TOKEN (or GITHUB_TOKEN) to a personal access token.");
         }
 
         response.EnsureSuccessStatusCode();
