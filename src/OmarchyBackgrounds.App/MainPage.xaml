@@ -118,10 +118,22 @@
                 Content="Open theme source"
                 NavigateUri="https://omarchy.org/themes/" />
             <Button
-                x:Name="ApplyButton"
+                x:Name="ApplyDesktopButton"
                 HorizontalAlignment="Stretch"
-                Click="ApplyButton_Click"
-                Content="Apply to desktop + lock screen"
+                Click="ApplyDesktopButton_Click"
+                Content="Apply desktop"
+                IsEnabled="False" />
+            <Button
+                x:Name="ApplyLockScreenButton"
+                HorizontalAlignment="Stretch"
+                Click="ApplyLockScreenButton_Click"
+                Content="Apply lock screen"
+                IsEnabled="False" />
+            <Button
+                x:Name="ApplyBothButton"
+                HorizontalAlignment="Stretch"
+                Click="ApplyBothButton_Click"
+                Content="Apply both"
                 IsEnabled="False" />
         </StackPanel>
 

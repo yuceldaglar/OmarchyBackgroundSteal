@@ -73,7 +73,7 @@ public sealed partial class MainPage : Page
     {
         _selectedBackground = null;
         _selectedLocalPath = null;
-        ApplyButton.IsEnabled = false;
+        SetApplyButtonsEnabled(false);
         PreviewImage.Source = null;
         _thumbnailLoadCts?.Cancel();
         _thumbnailLoadCts?.Dispose();
@@ -160,14 +160,14 @@ public sealed partial class MainPage : Page
         var background = item.Background;
         _selectedBackground = background;
         AttributionText.Text = background.Attribution;
-        ApplyButton.IsEnabled = false;
+        SetApplyButtonsEnabled(false);
         StatusText.Text = $"Downloading {background.FileName}…";
 
         try
         {
             _selectedLocalPath = await AppServices.BackgroundStore.GetLocalPathAsync(background);
             await SetPreviewFromPathAsync(_selectedLocalPath);
-            ApplyButton.IsEnabled = true;
+            SetApplyButtonsEnabled(true);
             StatusText.Text = $"Ready: {background.FileName}";
         }
         catch (Exception ex)
@@ -178,19 +178,48 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private async void ApplyButton_Click(object sender, RoutedEventArgs e)
+    private async void ApplyDesktopButton_Click(object sender, RoutedEventArgs e) =>
+        await ApplyAsync(desktop: true, lockScreen: false);
+
+    private async void ApplyLockScreenButton_Click(object sender, RoutedEventArgs e) =>
+        await ApplyAsync(desktop: false, lockScreen: true);
+
+    private async void ApplyBothButton_Click(object sender, RoutedEventArgs e) =>
+        await ApplyAsync(desktop: true, lockScreen: true);
+
+    private async Task ApplyAsync(bool desktop, bool lockScreen)
     {
         if (_selectedLocalPath is null || _selectedBackground is null)
         {
             return;
         }
 
-        ApplyButton.IsEnabled = false;
-        StatusText.Text = "Applying wallpaper…";
+        SetApplyButtonsEnabled(false);
+        var targets = new List<string>();
+        if (desktop)
+        {
+            targets.Add("desktop");
+        }
+
+        if (lockScreen)
+        {
+            targets.Add("lock screen");
+        }
+
+        StatusText.Text = $"Applying {string.Join(" + ", targets)}…";
         try
         {
-            await AppServices.WallpaperApplier.ApplyAsync(_selectedLocalPath);
-            StatusText.Text = $"Applied desktop + lock screen: {_selectedBackground.FileName}";
+            if (desktop)
+            {
+                await AppServices.WallpaperApplier.SetDesktopAsync(_selectedLocalPath);
+            }
+
+            if (lockScreen)
+            {
+                await AppServices.WallpaperApplier.SetLockScreenAsync(_selectedLocalPath);
+            }
+
+            StatusText.Text = $"Applied {string.Join(" + ", targets)}: {_selectedBackground.FileName}";
         }
         catch (Exception ex)
         {
@@ -198,8 +227,15 @@ public sealed partial class MainPage : Page
         }
         finally
         {
-            ApplyButton.IsEnabled = _selectedLocalPath is not null;
+            SetApplyButtonsEnabled(_selectedLocalPath is not null);
         }
+    }
+
+    private void SetApplyButtonsEnabled(bool enabled)
+    {
+        ApplyDesktopButton.IsEnabled = enabled;
+        ApplyLockScreenButton.IsEnabled = enabled;
+        ApplyBothButton.IsEnabled = enabled;
     }
 
     private async Task SetPreviewFromPathAsync(string localPath)

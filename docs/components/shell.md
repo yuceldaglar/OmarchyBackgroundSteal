@@ -8,7 +8,7 @@ WinUI 3 application UI for browsing Omarchy theme backgrounds and applying a sel
 2. Theme list shows **all** scraped themes
 3. Selecting a theme: `EnsureBackgroundsAsync` (GitHub Contents API once) → background grid + thumbnails
 4. Selecting a background downloads via `FileBackgroundStore` and shows preview + attribution/source link
-5. Apply → `IWallpaperApplier.ApplyAsync` (desktop + lock screen)
+5. Apply desktop, lock screen, or both via separate buttons → `IWallpaperApplier`
 
 ## API / wiring
 - Composition root: `AppServices` constructs `ThemeScraper`, `CatalogCache`, `CatalogService`, `FileBackgroundStore`, `WallpaperApplier`
