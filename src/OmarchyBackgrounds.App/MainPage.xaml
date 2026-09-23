@@ -5,27 +5,120 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:catalog="using:OmarchyBackgrounds.Catalog"
     mc:Ignorable="d">
 
-    <StackPanel
-        HorizontalAlignment="Center"
-        VerticalAlignment="Center"
-        Spacing="12">
+    <Grid Padding="16" RowSpacing="12" ColumnSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="320" />
+        </Grid.ColumnDefinitions>
+
         <TextBlock
-            FontSize="20"
+            Grid.ColumnSpan="3"
+            FontSize="22"
             FontWeight="SemiBold"
             Text="Omarchy Backgrounds" />
-        <TextBlock
-            Opacity="0.8"
-            Text="Slice 2: pick a local image and apply to desktop + lock screen."
-            TextWrapping="WrapWholeWords" />
-        <Button
-            x:Name="ApplyButton"
-            Click="ApplyLocalImage_Click"
-            Content="Apply local image…" />
+
         <TextBlock
             x:Name="StatusText"
-            Text="Ready."
+            Grid.Row="1"
+            Grid.ColumnSpan="3"
+            Opacity="0.85"
+            Text="Loading catalog…"
             TextWrapping="WrapWholeWords" />
-    </StackPanel>
+
+        <Grid Grid.Row="2" Grid.Column="0" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock FontWeight="SemiBold" Text="Themes" />
+            <ListView
+                x:Name="ThemeList"
+                Grid.Row="1"
+                SelectionChanged="ThemeList_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="catalog:Theme">
+                        <TextBlock Text="{x:Bind Name}" TextWrapping="NoWrap" />
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <Button
+                x:Name="RefreshButton"
+                Grid.Row="2"
+                HorizontalAlignment="Stretch"
+                Click="RefreshButton_Click"
+                Content="Refresh catalog" />
+        </Grid>
+
+        <Grid Grid.Row="2" Grid.Column="1" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock FontWeight="SemiBold" Text="Backgrounds" />
+            <GridView
+                x:Name="BackgroundGrid"
+                Grid.Row="1"
+                SelectionChanged="BackgroundGrid_SelectionChanged">
+                <GridView.ItemTemplate>
+                    <DataTemplate x:DataType="catalog:BackgroundImage">
+                        <Border
+                            Width="160"
+                            Height="100"
+                            Margin="4"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="4">
+                            <TextBlock
+                                Margin="8"
+                                VerticalAlignment="Bottom"
+                                Text="{x:Bind FileName}"
+                                TextWrapping="WrapWholeWords" />
+                        </Border>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Grid.Column="2" Spacing="12">
+            <TextBlock FontWeight="SemiBold" Text="Preview" />
+            <Border
+                Height="180"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                CornerRadius="4">
+                <Image x:Name="PreviewImage" Stretch="UniformToFill" />
+            </Border>
+            <TextBlock
+                x:Name="AttributionText"
+                Opacity="0.85"
+                Text="Select a background"
+                TextWrapping="WrapWholeWords" />
+            <HyperlinkButton
+                x:Name="SourceLink"
+                Content="Open theme source"
+                NavigateUri="https://omarchy.org/themes/" />
+            <Button
+                x:Name="ApplyButton"
+                HorizontalAlignment="Stretch"
+                Click="ApplyButton_Click"
+                Content="Apply to desktop + lock screen"
+                IsEnabled="False" />
+        </StackPanel>
+
+        <TextBlock
+            Grid.Row="3"
+            Grid.ColumnSpan="3"
+            Opacity="0.6"
+            Text="Source: omarchy.org/themes — wallpapers belong to their theme authors."
+            TextWrapping="WrapWholeWords" />
+    </Grid>
 </Page>
