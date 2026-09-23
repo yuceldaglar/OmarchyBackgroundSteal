@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OmarchyBackgrounds.App/OmarchyBackgrounds.App.csproj" />
+    <Project Path="src/OmarchyBackgrounds.BackgroundStore/OmarchyBackgrounds.BackgroundStore.csproj" />
+    <Project Path="src/OmarchyBackgrounds.Cache/OmarchyBackgrounds.Cache.csproj" />
+    <Project Path="src/OmarchyBackgrounds.Catalog/OmarchyBackgrounds.Catalog.csproj" />
+    <Project Path="src/OmarchyBackgrounds.Scraper/OmarchyBackgrounds.Scraper.csproj" />
+    <Project Path="src/OmarchyBackgrounds.Wallpaper/OmarchyBackgrounds.Wallpaper.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OmarchyBackgrounds.Tests/OmarchyBackgrounds.Tests.csproj" />
+  </Folder>
+</Solution>

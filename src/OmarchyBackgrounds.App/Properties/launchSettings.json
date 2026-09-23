@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "OmarchyBackgrounds.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "OmarchyBackgrounds.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

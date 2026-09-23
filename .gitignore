@@ -1,0 +1,40 @@
+## .NET
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.rsuser
+
+## NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## WinUI / MSIX
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+*_TemporaryKey.pfx
+*.appx
+*.msix
+*.msixbundle
+
+## OS / IDE
+Thumbs.db
+Desktop.ini
+.idea/
+*.swp
+*~
+
+## Local data
+**/LocalAppData/
+*.log
