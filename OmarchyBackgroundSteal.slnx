@@ -1,4 +1,11 @@
 <Solution>
+  <Configurations>
+    <BuildConfiguration Name="Debug" />
+    <BuildConfiguration Name="Release" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+    <Platform Name="ARM64" />
+  </Configurations>
   <Folder Name="/src/">
     <Project Path="src/OmarchyBackgrounds.App/OmarchyBackgrounds.App.csproj" />
     <Project Path="src/OmarchyBackgrounds.BackgroundStore/OmarchyBackgrounds.BackgroundStore.csproj" />

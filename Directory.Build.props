@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
+    <!-- WinUI app only supports these platforms (not Any CPU). Keep solution + libs aligned. -->
+    <Platforms>x64;x86;ARM64</Platforms>
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
   </PropertyGroup>
 </Project>
