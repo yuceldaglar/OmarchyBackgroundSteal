@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\OmarchyBackgrounds.Scraper\OmarchyBackgrounds.Scraper.csproj" />
     <ProjectReference Include="..\..\src\OmarchyBackgrounds.BackgroundStore\OmarchyBackgrounds.BackgroundStore.csproj" />
     <ProjectReference Include="..\..\src\OmarchyBackgrounds.Wallpaper\OmarchyBackgrounds.Wallpaper.csproj" />
+    <ProjectReference Include="..\..\src\OmarchyBackgrounds.ApplyHistory\OmarchyBackgrounds.ApplyHistory.csproj" />
   </ItemGroup>
 
 </Project>
