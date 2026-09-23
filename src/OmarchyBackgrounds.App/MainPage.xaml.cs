@@ -1,20 +1,54 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using OmarchyBackgrounds.Wallpaper;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace OmarchyBackgrounds_App;
 
-/// <summary>
-/// The main content page displayed inside the application window.
-/// Add your UI logic, event handlers, and data binding here.
-/// </summary>
 public sealed partial class MainPage : Page
 {
+    private readonly IWallpaperApplier _wallpaperApplier = new WallpaperApplier();
+
     public MainPage()
     {
         InitializeComponent();
+    }
 
-        // TODO: Add your initialization logic here.
+    private async void ApplyLocalImage_Click(object sender, RoutedEventArgs e)
+    {
+        StatusText.Text = "Choosing image…";
+
+        var picker = new FileOpenPicker();
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.MainWindowInstance));
+        picker.FileTypeFilter.Add(".jpg");
+        picker.FileTypeFilter.Add(".jpeg");
+        picker.FileTypeFilter.Add(".png");
+        picker.FileTypeFilter.Add(".bmp");
+        picker.FileTypeFilter.Add(".webp");
+        picker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
+
+        var file = await picker.PickSingleFileAsync();
+        if (file is null)
+        {
+            StatusText.Text = "Cancelled.";
+            return;
+        }
+
+        try
+        {
+            ApplyButton.IsEnabled = false;
+            StatusText.Text = "Applying…";
+            await _wallpaperApplier.ApplyAsync(file.Path);
+            StatusText.Text = $"Applied desktop + lock screen: {file.Name}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Apply failed: {ex.Message}";
+        }
+        finally
+        {
+            ApplyButton.IsEnabled = true;
+        }
     }
 }
