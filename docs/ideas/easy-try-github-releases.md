@@ -4,7 +4,7 @@
 How might we let any Windows user download and run Omarchy Backgrounds in minutes, without Visual Studio or building from source?
 
 ## Recommended Direction
-Local `dotnet publish` (self-contained win-x64) → zip → GitHub Release. A small `release.ps1` on the laptop creates the artifact; upload via the GitHub Releases UI (optional: `gh release create` later). README leads with Download, not clone.
+Local `dotnet publish` (self-contained **single-file** win-x64) → versioned zip containing **only** `OmarchyBackgrounds.App.exe` → GitHub Release. The exe name must stay `OmarchyBackgrounds.App.exe` (WinAppSDK resources); do not rename. A small `release.ps1` on the laptop creates the artifact; upload via the GitHub Releases UI. README leads with Download, not clone.
 
 Stay unpackaged (`WindowsPackageType=None`) for MVP. Signing and Store are deferred — signing is a paid/certificate workflow, not a one-click step. SmartScreen warnings are mitigated with clear “More info → Run anyway” docs until trust upgrades matter.
 
@@ -15,7 +15,7 @@ Stay unpackaged (`WindowsPackageType=None`) for MVP. Signing and Store are defer
 
 ## MVP Scope
 **In**
-- `release.ps1` (or equivalent): publish self-contained `win-x64`, zip output
+- `release.ps1`: publish self-contained single-file `win-x64`, zip with one `OmarchyBackgrounds.App.exe`
 - README “Download” section pointing at latest GitHub Release
 - First portable Release artifact
 
@@ -33,5 +33,5 @@ Stay unpackaged (`WindowsPackageType=None`) for MVP. Signing and Store are defer
 - **Changing Wallpaper/lock-screen packaging for the release** — separate problem from distribution
 
 ## Open Questions
-- Zip the whole publish folder vs. how we name the entry `.exe` in README
 - Whether to also publish `win-arm64` from day one or x64 only
+- Whether ~110 MB single-file size is acceptable vs. a smaller framework-dependent build

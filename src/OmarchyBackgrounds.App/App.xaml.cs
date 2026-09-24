@@ -8,6 +8,10 @@ public partial class App : Application
 
     public App()
     {
+        // Required for PublishSingleFile + Windows App SDK SxS / resources.pri lookup.
+        Environment.SetEnvironmentVariable(
+            "MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY",
+            AppContext.BaseDirectory);
         InitializeComponent();
     }
 

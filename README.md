@@ -5,8 +5,8 @@ WinUI 3 app to browse Omarchy theme backgrounds and apply them to desktop + lock
 ## Download
 
 1. Open the [latest GitHub Release](https://github.com/yuceldaglar/OmarchyBackgroundSteal/releases/latest)
-2. Download `OmarchyBackgrounds-win-x64-*.zip`
-3. Unzip, then run **`OmarchyBackgrounds.App.exe`**
+2. Download `OmarchyBackgrounds-win-x64-*.zip` (contains a single `.exe`)
+3. Unzip and run **`OmarchyBackgrounds.App.exe`** — do not rename the exe
 
 No Visual Studio or .NET SDK required. If Windows SmartScreen appears: **More info** → **Run anyway** (the build is unsigned for now).
 

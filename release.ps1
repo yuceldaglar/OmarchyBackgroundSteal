@@ -1,8 +1,9 @@
-# Build a portable zip for GitHub Releases (self-contained win-x64, unpackaged).
+# Build a single-file WinUI exe for GitHub Releases (win-x64, unpackaged).
 # From repo root:  .\release.ps1
 # Optional:       .\release.ps1 -Version 0.1.0
 #
-# Upload the zip on GitHub → Releases → Draft a new release.
+# The published binary must keep the name OmarchyBackgrounds.App.exe (WinAppSDK
+# resources.pri / SxS). We wrap that one file in a versioned zip for Releases.
 [CmdletBinding()]
 param(
     [string] $Version
@@ -17,48 +18,66 @@ if (-not $Version) {
     if ($desc) { $Version = $desc.Trim() } else { $Version = "0.0.0-dev" }
 }
 
-# Zip-safe: avoid path separators from git describe
 $Version = ($Version -replace '[\\/:\*\?"<>\|]', '-')
 
 $rid = "win-x64"
 $project = ".\src\OmarchyBackgrounds.App\OmarchyBackgrounds.App.csproj"
 $publishDir = Join-Path $PSScriptRoot "artifacts\publish\$rid"
+$appExeName = "OmarchyBackgrounds.App.exe"
 $zipName = "OmarchyBackgrounds-$rid-$Version.zip"
 $zipPath = Join-Path $PSScriptRoot "artifacts\$zipName"
+$stagingDir = Join-Path $PSScriptRoot "artifacts\staging\$rid"
 
-Write-Host "Publishing $rid (self-contained, Release)..."
+Write-Host "Publishing $rid (self-contained single-file, Release)..."
 if (Test-Path $publishDir) {
     Remove-Item $publishDir -Recurse -Force
 }
 New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
-# PublishTrimmed=false: WinUI + Windows App SDK are safer untrimmed for portable runs.
 dotnet publish $project `
     -c Release `
     -p:Platform=x64 `
     -r $rid `
     --self-contained true `
+    -p:WindowsAppSDKSelfContained=true `
+    -p:WindowsAppSdkUndockedRegFreeWinRTInitialize=true `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:IncludeAllContentForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true `
     -p:PublishTrimmed=false `
-    -p:PublishSingleFile=false `
+    -p:DebugType=None `
+    -p:DebugSymbols=false `
     -o $publishDir
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }
 
-$exe = Join-Path $publishDir "OmarchyBackgrounds.App.exe"
-if (-not (Test-Path $exe)) {
-    throw "Expected executable not found: $exe"
+$publishedExe = Join-Path $publishDir $appExeName
+if (-not (Test-Path $publishedExe)) {
+    throw "Expected executable not found: $publishedExe"
 }
 
-Write-Host "Zipping -> $zipPath"
+$extra = @(Get-ChildItem $publishDir -File | Where-Object { $_.Name -ne $appExeName })
+if ($extra.Count -gt 0) {
+    Write-Warning ("Publish folder has extra files (expected only the exe): " + (($extra | ForEach-Object Name) -join ", "))
+}
+
+# Stage exactly one file under the required exe name, then zip.
+if (Test-Path $stagingDir) {
+    Remove-Item $stagingDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+Copy-Item $publishedExe (Join-Path $stagingDir $appExeName)
+
 New-Item -ItemType Directory -Path (Split-Path $zipPath) -Force | Out-Null
 if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
 }
-Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
+Compress-Archive -Path (Join-Path $stagingDir $appExeName) -DestinationPath $zipPath -CompressionLevel Optimal
 
 $sizeMb = [math]::Round((Get-Item $zipPath).Length / 1MB, 1)
 Write-Host ""
 Write-Host "Done. Artifact: $zipPath ($sizeMb MB)"
-Write-Host "Run after unzip: OmarchyBackgrounds.App.exe"
+Write-Host "Inside the zip: $appExeName (do not rename — required for WinUI single-file)."
 Write-Host "Upload this zip on GitHub -> Releases."
